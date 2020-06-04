@@ -14,48 +14,49 @@ public class Pipeline {
     this.log = log;
   }
 
-  public void run(Project project) {
-    boolean testsPassed;
-    boolean deploySuccessful;
-
-    if (project.hasTests()) {
-      if ("success".equals(project.runTests())) {
-        log.info("Tests passed");
-        testsPassed = true;
-      } else {
-        log.error("Tests failed");
-        testsPassed = false;
-      }
-    } else {
+  private boolean test(Project project) {
+    if (!project.hasTests()) {
       log.info("No tests");
-      testsPassed = true;
+      return true;
     }
+    if ("success".equals(project.runTests())) {
+      log.info("Tests passed");
+      return true;
+    }
+    log.error("Tests failed");
+    return false;
 
-    if (testsPassed) {
-      if ("success".equals(project.deploy())) {
-        log.info("Deployment successful");
-        deploySuccessful = true;
-      } else {
-        log.error("Deployment failed");
-        deploySuccessful = false;
-      }
-    } else {
-      deploySuccessful = false;
-    }
-
-    if (config.sendEmailSummary()) {
-      log.info("Sending email");
-      if (testsPassed) {
-        if (deploySuccessful) {
-          emailer.send("Deployment completed successfully");
-        } else {
-          emailer.send("Deployment failed");
-        }
-      } else {
-        emailer.send("Tests failed");
-      }
-    } else {
-      log.info("Email disabled");
-    }
   }
+
+  private boolean isDeploySuccessFull(Project project) {
+    return "success".equals(project.deploy());
+  }
+
+  private String deploy(Project project) {
+    if (!test(project)) {
+      return "Tests failed";
+    }
+
+    if (!isDeploySuccessFull(project)) {
+      log.error("Deployment failed");
+      return "Deployment failed";
+    }
+
+    log.info("Deployment successful");
+    return "Deployment completed successfully";
+  }
+
+  private void sendEmail(String report) {
+    if (!config.sendEmailSummary()) {
+      log.info("Email disabled");
+      return;
+    }
+    log.info("Sending email");
+    emailer.send(report);
+  }
+
+  public void run(Project project) {
+    sendEmail(deploy(project));
+  }
+
 }
